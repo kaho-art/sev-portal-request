@@ -503,3 +503,25 @@ select:focus-visible {
 .act-edit {
   border-style: dashed;
 }
+
+/* ---- v3 追加分 ---- */
+.form-grid textarea {
+  font: inherit;
+  font-size: 15px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.card .content {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 2px 0 4px;
+}

@@ -1,10 +1,8 @@
 /**
- * 部品・修理 依頼ボード — Apps Script バックエンド (v2)
+ * 部品・修理 依頼ボード — Apps Script バックエンド (v3)
  *
- * 変更点(v2):
- * - 種別: 見積り / 部品発注 / 請求書
- * - 依頼日時(時刻まで)を記録
- * - 依頼内容の編集に対応。最終編集者と更新日時を記録
+ * 変更点(v3):
+ * - 部品名・数量・場所・メモを廃止 → 「依頼内容」自由記述1欄に統合
  *
  * 更新方法:
  * 1. スプレッドシート →「拡張機能」→「Apps Script」
@@ -16,10 +14,10 @@
 
 var SHEET_NAME = "依頼一覧";
 var HEADERS = [
-  "ID", "依頼日時", "依頼者", "種別", "部品名", "数量",
-  "使う場所・設備", "メモ", "ステータス", "対応者", "最終編集者", "更新日時"
+  "ID", "依頼日時", "依頼者", "種別", "依頼内容",
+  "ステータス", "対応者", "最終編集者", "更新日時"
 ];
-var COLS = HEADERS.length; // 12
+var COLS = HEADERS.length; // 9
 
 function doPost(e) {
   var body;
@@ -51,7 +49,7 @@ function doPost(e) {
 
 // 動作確認用(ブラウザでURLを開いたとき)
 function doGet() {
-  return json({ ok: true, message: "依頼ボードAPI v2 は動いています。" });
+  return json({ ok: true, message: "依頼ボードAPI v3 は動いています。" });
 }
 
 function json(obj) {
@@ -74,7 +72,7 @@ function init() {
   var sheet = getSheet();
   sheet.getRange(1, 1, 1, COLS).setValues([HEADERS]);
   sheet.setFrozenRows(1);
-  return { ok: true, message: "「" + SHEET_NAME + "」シートを初期化しました(v2)。" };
+  return { ok: true, message: "「" + SHEET_NAME + "」シートを初期化しました(v3)。" };
 }
 
 function nowJst() {
@@ -87,14 +85,11 @@ function rowToObj(row) {
     date: String(row[1] || ""),
     requester: String(row[2] || ""),
     type: String(row[3] || ""),
-    part: String(row[4] || ""),
-    qty: String(row[5] || ""),
-    place: String(row[6] || ""),
-    memo: String(row[7] || ""),
-    status: String(row[8] || "未対応"),
-    handler: String(row[9] || ""),
-    editor: String(row[10] || ""),
-    updatedAt: String(row[11] || "")
+    content: String(row[4] || ""),
+    status: String(row[5] || "未対応"),
+    handler: String(row[6] || ""),
+    editor: String(row[7] || ""),
+    updatedAt: String(row[8] || "")
   };
 }
 
@@ -107,25 +102,22 @@ function list() {
 }
 
 function add(body) {
-  if (!body.part || !body.requester) {
-    throw new Error("依頼者と部品名は必須です。");
+  if (!body.content || !body.requester) {
+    throw new Error("依頼者と依頼内容は必須です。");
   }
   var sheet = getSheet();
   var id = "R" + new Date().getTime().toString(36).toUpperCase();
   var time = nowJst();
   var row = [
     id,
-    time,                       // 依頼日時(時刻まで)
+    time,                    // 依頼日時
     body.requester || "",
     body.type || "見積り",
-    body.part || "",
-    body.qty || "",
-    body.place || "",
-    body.memo || "",
+    body.content || "",
     "未対応",
-    "",                         // 対応者
-    "",                         // 最終編集者
-    time                        // 更新日時
+    "",                      // 対応者
+    "",                      // 最終編集者
+    time                     // 更新日時
   ];
   sheet.appendRow(row);
   return rowToObj(row);
@@ -136,7 +128,7 @@ function findRow(sheet, id) {
   if (last < 2) return -1;
   var ids = sheet.getRange(2, 1, last - 1, 1).getDisplayValues();
   for (var i = 0; i < ids.length; i++) {
-    if (ids[i][0] === id) return i + 2; // 行番号
+    if (ids[i][0] === id) return i + 2;
   }
   return -1;
 }
@@ -147,15 +139,15 @@ function update(body) {
   var rowNum = findRow(sheet, body.id);
   if (rowNum === -1) throw new Error("対象の依頼が見つかりません。");
 
-  var currentHandler = sheet.getRange(rowNum, 10).getDisplayValue();
+  var currentHandler = sheet.getRange(rowNum, 7).getDisplayValue();
   var handler = body.handler !== undefined && body.handler !== null
     ? body.handler
     : currentHandler;
 
-  // I:ステータス J:対応者
-  sheet.getRange(rowNum, 9, 1, 2).setValues([[body.status, handler]]);
-  // L:更新日時
-  sheet.getRange(rowNum, 12).setValue(nowJst());
+  // F:ステータス G:対応者
+  sheet.getRange(rowNum, 6, 1, 2).setValues([[body.status, handler]]);
+  // I:更新日時
+  sheet.getRange(rowNum, 9).setValue(nowJst());
 
   var row = sheet.getRange(rowNum, 1, 1, COLS).getDisplayValues()[0];
   return rowToObj(row);
@@ -164,24 +156,21 @@ function update(body) {
 // 依頼内容の編集
 function edit(body) {
   if (!body.editor) throw new Error("編集者の名前は必須です。");
-  if (!body.part || !body.requester) {
-    throw new Error("依頼者と部品名は必須です。");
+  if (!body.content || !body.requester) {
+    throw new Error("依頼者と依頼内容は必須です。");
   }
   var sheet = getSheet();
   var rowNum = findRow(sheet, body.id);
   if (rowNum === -1) throw new Error("対象の依頼が見つかりません。");
 
-  // C:依頼者 D:種別 E:部品名 F:数量 G:場所 H:メモ
-  sheet.getRange(rowNum, 3, 1, 6).setValues([[
+  // C:依頼者 D:種別 E:依頼内容
+  sheet.getRange(rowNum, 3, 1, 3).setValues([[
     body.requester || "",
     body.type || "見積り",
-    body.part || "",
-    body.qty || "",
-    body.place || "",
-    body.memo || ""
+    body.content || ""
   ]]);
-  // K:最終編集者 L:更新日時
-  sheet.getRange(rowNum, 11, 1, 2).setValues([[body.editor, nowJst()]]);
+  // H:最終編集者 I:更新日時
+  sheet.getRange(rowNum, 8, 1, 2).setValues([[body.editor, nowJst()]]);
 
   var row = sheet.getRange(rowNum, 1, 1, COLS).getDisplayValues()[0];
   return rowToObj(row);

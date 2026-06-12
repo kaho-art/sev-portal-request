@@ -18,10 +18,7 @@ export async function PATCH(req, { params }) {
       const item = await editRequest(params.id, {
         requester: body.requester,
         type: body.type,
-        part: body.part,
-        qty: body.qty,
-        place: body.place,
-        memo: body.memo,
+        content: body.content,
         editor: body.editor,
       });
       return NextResponse.json({ item });

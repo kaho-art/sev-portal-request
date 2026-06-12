@@ -9,16 +9,13 @@ const TYPES = ["見積り", "部品発注", "請求書"];
 const EMPTY_FORM = {
   requester: "",
   type: "見積り",
-  part: "",
-  qty: "",
-  place: "",
-  memo: "",
+  content: "",
   editor: "",
 };
 
 function typeClass(type) {
-  if (type === "見積り" || type === "見積依頼") return "t-quote";
-  if (type === "部品発注" || type === "使用報告") return "t-order";
+  if (type === "見積り") return "t-quote";
+  if (type === "部品発注") return "t-order";
   if (type === "請求書") return "t-invoice";
   return "t-other";
 }
@@ -65,10 +62,7 @@ export default function Home() {
     setForm({
       requester: item.requester,
       type: TYPES.includes(item.type) ? item.type : "見積り",
-      part: item.part,
-      qty: item.qty,
-      place: item.place,
-      memo: item.memo,
+      content: item.content,
       editor: "",
     });
     setShowForm(true);
@@ -82,8 +76,8 @@ export default function Home() {
   }
 
   async function submit() {
-    if (!form.requester || !form.part) {
-      setError("依頼者と部品名は入れてください。");
+    if (!form.requester || !form.content) {
+      setError("依頼者と依頼内容は入れてください。");
       return;
     }
     if (editingId && !form.editor) {
@@ -94,7 +88,6 @@ export default function Home() {
     setError("");
     try {
       if (editingId) {
-        // 編集
         const res = await fetch(`/api/requests/${editingId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -106,7 +99,6 @@ export default function Home() {
           prev.map((x) => (x.id === editingId ? data.item : x))
         );
       } else {
-        // 新規
         const res = await fetch("/api/requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,35 +225,12 @@ export default function Home() {
               </select>
             </label>
             <label className="span2">
-              部品名 *
-              <input
-                value={form.part}
-                onChange={(e) => setForm({ ...form, part: e.target.value })}
-                placeholder="例: ベアリング 6204ZZ"
-              />
-            </label>
-            <label>
-              数量
-              <input
-                value={form.qty}
-                onChange={(e) => setForm({ ...form, qty: e.target.value })}
-                placeholder="例: 2個"
-              />
-            </label>
-            <label>
-              使う場所・設備
-              <input
-                value={form.place}
-                onChange={(e) => setForm({ ...form, place: e.target.value })}
-                placeholder="例: 3号ライン コンベア"
-              />
-            </label>
-            <label className="span2">
-              メモ
-              <input
-                value={form.memo}
-                onChange={(e) => setForm({ ...form, memo: e.target.value })}
-                placeholder="急ぎ・型番不明など何でも"
+              依頼内容 *
+              <textarea
+                rows={4}
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                placeholder={"自由に書いてください\n例: ベアリング6204ZZ 2個、3号ラインのコンベア用。急ぎでお願いします"}
               />
             </label>
             {editingId && (
@@ -310,14 +279,7 @@ export default function Home() {
                   <span className="meta-mono">{item.date}</span>
                   <span className="meta-mono dim">{item.id}</span>
                 </div>
-                <h2 className="part">
-                  {item.part}
-                  {item.qty && <span className="qty">× {item.qty}</span>}
-                </h2>
-                <p className="detail">
-                  {item.place && <span className="place">{item.place}</span>}
-                  {item.memo && <span className="memo">{item.memo}</span>}
-                </p>
+                <p className="content">{item.content}</p>
                 <p className="people">
                   依頼: <b>{item.requester}</b>
                   {item.handler && (

@@ -10,7 +10,7 @@ export async function GET() {
   } catch (e) {
     console.error(e);
     return NextResponse.json(
-      { error: "シートの読み込みに失敗しました。環境変数とシートの共有設定を確認してください。" },
+      { error: e.message || "シートの読み込みに失敗しました。" },
       { status: 500 }
     );
   }
@@ -19,9 +19,9 @@ export async function GET() {
 export async function POST(req) {
   try {
     const body = await req.json();
-    if (!body.part || !body.requester) {
+    if (!body.content || !body.requester) {
       return NextResponse.json(
-        { error: "依頼者と部品名は必須です。" },
+        { error: "依頼者と依頼内容は必須です。" },
         { status: 400 }
       );
     }
@@ -30,7 +30,7 @@ export async function POST(req) {
   } catch (e) {
     console.error(e);
     return NextResponse.json(
-      { error: "登録に失敗しました。" },
+      { error: e.message || "登録に失敗しました。" },
       { status: 500 }
     );
   }
