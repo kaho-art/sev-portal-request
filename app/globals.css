@@ -472,3 +472,34 @@ select:focus-visible {
     grid-column: span 1;
   }
 }
+
+/* ---- v2 追加分 ---- */
+.t-order {
+  background: var(--machine);
+}
+
+.t-invoice {
+  background: #4a7c59; /* 請求書 */
+}
+
+.t-other {
+  background: var(--ink-soft);
+}
+
+.form-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.editor-field input {
+  border-color: var(--safety);
+  background: #fff8f2;
+}
+
+.act-edit {
+  border-style: dashed;
+}

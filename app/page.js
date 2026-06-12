@@ -4,6 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 
 const STATUSES = ["未対応", "対応中", "済"];
 const FILTERS = ["すべて", "未対応", "対応中", "済"];
+const TYPES = ["見積り", "部品発注", "請求書"];
+
+const EMPTY_FORM = {
+  requester: "",
+  type: "見積り",
+  part: "",
+  qty: "",
+  place: "",
+  memo: "",
+  editor: "",
+};
+
+function typeClass(type) {
+  if (type === "見積り" || type === "見積依頼") return "t-quote";
+  if (type === "部品発注" || type === "使用報告") return "t-order";
+  if (type === "請求書") return "t-invoice";
+  return "t-other";
+}
 
 export default function Home() {
   const [items, setItems] = useState([]);
@@ -11,16 +29,10 @@ export default function Home() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("すべて");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null); // null=新規, それ以外=編集中のID
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
-  const [form, setForm] = useState({
-    requester: "",
-    type: "見積依頼",
-    part: "",
-    qty: "",
-    place: "",
-    memo: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   async function load() {
     setLoading(true);
@@ -41,24 +53,70 @@ export default function Home() {
     load();
   }, []);
 
+  function openNewForm() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openEditForm(item) {
+    setEditingId(item.id);
+    setForm({
+      requester: item.requester,
+      type: TYPES.includes(item.type) ? item.type : "見積り",
+      part: item.part,
+      qty: item.qty,
+      place: item.place,
+      memo: item.memo,
+      editor: "",
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+  }
+
   async function submit() {
     if (!form.requester || !form.part) {
       setError("依頼者と部品名は入れてください。");
       return;
     }
+    if (editingId && !form.editor) {
+      setError("編集者(あなたの名前)を入れてください。");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "登録エラー");
-      setItems((prev) => [data.item, ...prev]);
-      setForm({ requester: "", type: "見積依頼", part: "", qty: "", place: "", memo: "" });
-      setShowForm(false);
+      if (editingId) {
+        // 編集
+        const res = await fetch(`/api/requests/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "edit", ...form }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "編集エラー");
+        setItems((prev) =>
+          prev.map((x) => (x.id === editingId ? data.item : x))
+        );
+      } else {
+        // 新規
+        const res = await fetch("/api/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "登録エラー");
+        setItems((prev) => [data.item, ...prev]);
+      }
+      closeForm();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -136,13 +194,24 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <button className="add-btn" onClick={() => setShowForm((v) => !v)}>
+        <button
+          className="add-btn"
+          onClick={() => (showForm ? closeForm() : openNewForm())}
+        >
           {showForm ? "閉じる" : "＋ 依頼を出す"}
         </button>
       </div>
 
       {showForm && (
-        <section className="form-card" aria-label="新規依頼フォーム">
+        <section
+          className="form-card"
+          aria-label={editingId ? "依頼の編集フォーム" : "新規依頼フォーム"}
+        >
+          {editingId && (
+            <p className="form-title">
+              依頼 <span className="meta-mono">{editingId}</span> を編集中
+            </p>
+          )}
           <div className="form-grid">
             <label>
               依頼者 *
@@ -158,8 +227,9 @@ export default function Home() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
-                <option>見積依頼</option>
-                <option>使用報告</option>
+                {TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
             </label>
             <label className="span2">
@@ -194,9 +264,23 @@ export default function Home() {
                 placeholder="急ぎ・型番不明など何でも"
               />
             </label>
+            {editingId && (
+              <label className="span2 editor-field">
+                編集者(あなたの名前) *
+                <input
+                  value={form.editor}
+                  onChange={(e) => setForm({ ...form, editor: e.target.value })}
+                  placeholder="例: 佐藤"
+                />
+              </label>
+            )}
           </div>
           <button className="submit-btn" onClick={submit} disabled={saving}>
-            {saving ? "登録中…" : "この内容で依頼する"}
+            {saving
+              ? "保存中…"
+              : editingId
+              ? "この内容に変更する"
+              : "この内容で依頼する"}
           </button>
         </section>
       )}
@@ -220,7 +304,7 @@ export default function Home() {
             >
               <div className="card-main">
                 <div className="card-top">
-                  <span className={"type-badge " + (item.type === "見積依頼" ? "t-quote" : "t-report")}>
+                  <span className={"type-badge " + typeClass(item.type)}>
                     {item.type}
                   </span>
                   <span className="meta-mono">{item.date}</span>
@@ -241,7 +325,12 @@ export default function Home() {
                       {" "}/ 対応: <b>{item.handler}</b>
                     </>
                   )}
-                  <span className="meta-mono dim"> 更新 {item.updatedAt}</span>
+                  {item.editor && (
+                    <>
+                      {" "}/ 編集: <b>{item.editor}</b>
+                      <span className="meta-mono dim">({item.updatedAt})</span>
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -249,7 +338,12 @@ export default function Home() {
                 {item.status === "済" ? (
                   <div className="hanko" aria-label="対応済">済</div>
                 ) : (
-                  <span className={"status-pill s-" + (item.status === "対応中" ? "doing" : "todo")}>
+                  <span
+                    className={
+                      "status-pill s-" +
+                      (item.status === "対応中" ? "doing" : "todo")
+                    }
+                  >
                     {item.status}
                   </span>
                 )}
@@ -270,6 +364,13 @@ export default function Home() {
                         : "未対応に戻す"}
                     </button>
                   ))}
+                  <button
+                    className="act act-edit"
+                    disabled={busyId === item.id}
+                    onClick={() => openEditForm(item)}
+                  >
+                    ✎ 編集
+                  </button>
                 </div>
               </div>
             </li>
