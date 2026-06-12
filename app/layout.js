@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "部品・修理 依頼ボード",
-  description: "見積依頼・使用報告をみんなで共有するボード",
+  title: "いろいろ依頼ボード",
+  description: "見積依頼・発注依頼をみんなで共有するボード",
 };
 
 export default function RootLayout({ children }) {
